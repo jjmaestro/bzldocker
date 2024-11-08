@@ -1,0 +1,58 @@
+name: docker-image
+
+on:
+  workflow_dispatch:
+    inputs:
+      imageVersion:
+        description: 'Image Version'
+        required: true
+
+env:
+  BASE_IMAGE: debian
+  BASE_IMAGE_TAG: bookworm-20240926-slim
+  BAZEL_VERSION: 7.3.1
+  REPRODUCIBLE_CONTAINERS_VERSION: 0.1.4
+  BAZELISK_VERSION: 1.20.0
+
+  REGISTRY: ghcr.io
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add IMAGE_NAME to env
+        run: |-
+          echo "IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository }}/$BASE_IMAGE" >> $GITHUB_ENV
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: |-
+            linux/amd64
+            linux/arm64
+          build-args: |-
+            BAZEL_VERSION=${{ env.BAZEL_VERSION }}
+            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            BASE_IMAGE_TAG=${{ env.BASE_IMAGE_TAG }}
+            REPRODUCIBLE_CONTAINERS_VERSION=${{ env.REPRODUCIBLE_CONTAINERS_VERSION }}
+            BAZELISK_VERSION=${{ env.BAZELISK_VERSION }}
+            BAZEL_VERSION=${{ env.BAZEL_VERSION }}
+          push: true
+          tags: |-
+            ${{ env.IMAGE_NAME }}:${{ github.event.inputs.imageVersion }}
+            ${{ env.IMAGE_NAME }}:latest
+          labels: |-
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
