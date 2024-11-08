@@ -26,6 +26,16 @@ all: gen-image
 
 .PHONY: all
 
+push-image: gen-image
+	@echo "\nPushing $(TAG) and tagging as :latest" && \
+	echo "\n\nEnter a GH Personal Access Token with (at least) write:packages scope:" && \
+	$(DOCKER) login --username $(USER) $(REGISTRY)  && \
+	$(DOCKER) image push $(TAG) && \
+	$(DOCKER) image tag $(TAG) $(REGISTRY)/$(IMAGE_NAME):latest && \
+	$(DOCKER) image push $(REGISTRY)/$(IMAGE_NAME):latest \
+
+.PHONY: push-image
+
 gen-image: .Dockerfile
 
 .PHONY: gen-image
