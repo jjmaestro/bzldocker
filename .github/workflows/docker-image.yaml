@@ -1,11 +1,16 @@
 name: docker-image
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+
   workflow_dispatch:
     inputs:
-      imageVersion:
+      IMAGE_VERSION:
         description: 'Image Version'
-        required: true
 
 env:
   BASE_IMAGE: debian
@@ -20,9 +25,17 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - name: Add IMAGE_NAME to env
+      - name: Set up dynamic env
         run: |-
-          echo "IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository }}/$BASE_IMAGE" >> $GITHUB_ENV
+          {
+            if [[ -z "${{ github.event.inputs.IMAGE_VERSION }}" ]]; then
+              echo "IMAGE_VERSION=$(date +%Y%m%d)"
+            else
+              echo "IMAGE_VERSION=${{ github.event.inputs.imageVersion }}"
+            fi
+
+            echo "IMAGE_NAME=${{ env.REGISTRY }}/${{ github.repository }}/$BASE_IMAGE"
+          } >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -52,7 +65,7 @@ jobs:
             BAZEL_VERSION=${{ env.BAZEL_VERSION }}
           push: true
           tags: |-
-            ${{ env.IMAGE_NAME }}:${{ github.event.inputs.imageVersion }}
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_VERSION }}
             ${{ env.IMAGE_NAME }}:latest
           labels: |-
             org.opencontainers.image.source=${{ github.repositoryUrl }}
