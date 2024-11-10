@@ -1,0 +1,21 @@
+USER root
+
+## setup C compiler
+RUN /bin/bash <<EOF
+$APT_INSTALL
+apt_install gcc libc6-dev
+EOF
+
+## setup C++ compiler (rules_bison)
+RUN /bin/bash <<EOF
+$APT_INSTALL
+apt_install g++
+EOF
+
+# rules_distroless
+RUN /bin/bash <<EOF
+$APT_INSTALL
+apt_install xz-utils
+EOF
+
+USER nonroot

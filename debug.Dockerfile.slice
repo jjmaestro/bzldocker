@@ -1,0 +1,9 @@
+USER root
+
+# setup basic tooling that's useful for debugging, etc (bsdextrautils: column)
+RUN /bin/bash <<EOF
+$APT_INSTALL
+apt_install vim curl grep less file tree bsdextrautils
+EOF
+
+USER nonroot

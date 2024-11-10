@@ -1,11 +1,12 @@
-# Action to build and deploy a multi-platform Docker image from the Dockerfile
+# Action to build and deploy a multi-platform Docker image from the Dockerfiles
 # in the repo.
 #
 # This action is triggered by a push to the main branch when the commits have
-# changes to the Dockerfile. It can also be triggered by hand via the web UI or
-# the gh CLI tool (gh workflow run docker-image).
+# changes to the Dockerfiles. It can also be triggered by hand via the web UI
+# or the gh CLI tool (gh workflow run docker-image).
 #
-# When triggered by a push, it will push to the GH registry two image tags:
+# When triggered by a push, it will push to the GH registry two image tags for
+# every "image slice" ('base', 'main' and 'debug'):
 #   * a 'version' tag where the version is the current date in ISO format
 #   * a 'latest' tag pointing to the version tag
 #
@@ -25,7 +26,7 @@ on:
     branches:
       - main
     paths:
-      - "*Dockerfile"
+      - "*Dockerfile*"
 
   workflow_dispatch:
     inputs:
@@ -50,12 +51,20 @@ env:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        slice:
+          - name: base
+          - name: main
+          - name: debug
+            deps:
+              - main
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout-cone-mode: false
           sparse-checkout: |-
-            *Dockerfile
+            *Dockerfile*
 
       - name: Set up dynamic env
         run: |-
@@ -74,7 +83,23 @@ jobs:
             TAGS[latest]="latest"
           fi
 
-          IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}/$BASE_IMAGE"
+          SLICE="$BASE_IMAGE"
+          cat "base.Dockerfile" > Dockerfile
+
+          if [[ "${{ matrix.slice.name }}" != "base" ]]; then
+            SLICE="$BASE_IMAGE-${{ matrix.slice.name }}"
+
+            declare -A DEPS
+            DEPS=( ${{ join(matrix.slice.deps, ' ') }} )
+
+            for dep in ${DEPS[@]}; do
+              cat ${dep}.Dockerfile.slice >> Dockerfile
+            done
+
+            cat ${{ matrix.slice.name }}.Dockerfile.slice >> Dockerfile
+          fi
+
+          IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}/$SLICE"
 
           {
             for tag in ${!TAGS[@]}; do
@@ -99,7 +124,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: base.Dockerfile
+          file: Dockerfile
           platforms: |-
             linux/amd64
             linux/arm64
