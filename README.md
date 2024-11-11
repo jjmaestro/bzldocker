@@ -1,3 +1,5 @@
+[![docker-image](https://github.com/jjmaestro/bzldocker/actions/workflows/docker-image.yaml/badge.svg?branch=main&event=push)](https://github.com/jjmaestro/bzldocker/actions/workflows/docker-image.yaml)
+
 # Bazel Docker Image
 
 Multi-platform Bazel Docker image:
