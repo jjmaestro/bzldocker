@@ -1,20 +1,37 @@
 # Action to build and deploy a multi-platform Docker image from the Dockerfiles
 # in the repo.
 #
-# This action is triggered by a push to the main branch when the commits have
-# changes to the Dockerfiles. It can also be triggered by hand via the web UI
-# or the gh CLI tool (gh workflow run docker-image).
+# This GH Action builds three different "flavors" (types of images): `base`,
+# `main` and `debug`.
+#
+# The workflow will dynamically compose the Dockerfile to build the images. It
+# will use the `base.Dockerfile` as a "preamble" that will be concatenated to
+# the `<FLAVOR>.Dockerfile.flavor` to create the final `Dockerfile` that will
+# be used for building the image.
+#
+# ### Action Triggers
+#
+# The `docker-image` action is triggered by a push to the `main` branch when it
+# affects the `Dockerfile`s (`base` or any of the flavors). It can also be
+# triggered manually via the Actions web UI, the GH REST API or the GH CLI
+# tool:
+#
+# gh workflow run docker-image
+#
+# #### `push`
 #
 # When triggered by a push, it will push to the GH registry two image tags for
-# every "image slice" ('base', 'main' and 'debug'):
-#   * a 'version' tag where the version is the current date in ISO format
-#   * a 'latest' tag pointing to the version tag
+# every "image flavor":
+#   * a `version` tag where the version is the current date in ISO format
+#   * a `latest` tag pointing to the version tag
 #
-# When triggered by hand, the workflow will run as a "dry-run" by default. That
-# is, it will still set the 'version' tag to the current date in ISO format but
-# **it won't tag 'latest' or push the tags to the registry**.
+# #### `workflow_dispatch` (manual)
 #
-# To override these defaults, use the 'IMAGE_VERSION', 'TAG_LATEST' and 'PUSH'
+# When triggered by hand, the workflow will run as a `dry-run` by default. That
+# is, it will still set the `version` tag to the current date in ISO format but
+# **it won't tag `latest` or push the tags to the registry**.
+#
+# To override these defaults, use the `IMAGE_VERSION`, `TAG_LATEST` and `PUSH`
 # variables, e.g.:
 #
 # gh workflow run docker-image -f IMAGE_VERSION=20241101-testing
@@ -53,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        slice:
+        flavor:
           - name: base
           - name: main
           - name: debug
@@ -83,23 +100,23 @@ jobs:
             TAGS[latest]="latest"
           fi
 
-          SLICE="$BASE_IMAGE"
+          FLAVOR="$BASE_IMAGE"
           cat "base.Dockerfile" > Dockerfile
 
-          if [[ "${{ matrix.slice.name }}" != "base" ]]; then
-            SLICE="$BASE_IMAGE-${{ matrix.slice.name }}"
+          if [[ "${{ matrix.flavor.name }}" != "base" ]]; then
+            FLAVOR="$BASE_IMAGE-${{ matrix.flavor.name }}"
 
             declare -A DEPS
-            DEPS=( ${{ join(matrix.slice.deps, ' ') }} )
+            DEPS=( ${{ join(matrix.flavor.deps, ' ') }} )
 
             for dep in ${DEPS[@]}; do
-              cat ${dep}.Dockerfile.slice >> Dockerfile
+              cat ${dep}.Dockerfile.flavor >> Dockerfile
             done
 
-            cat ${{ matrix.slice.name }}.Dockerfile.slice >> Dockerfile
+            cat ${{ matrix.flavor.name }}.Dockerfile.flavor >> Dockerfile
           fi
 
-          IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}/$SLICE"
+          IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}/$FLAVOR"
 
           {
             for tag in ${!TAGS[@]}; do
