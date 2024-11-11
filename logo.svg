@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  id="bzldocker_logo"
+  viewBox="0 0 800 800">
+  <defs>
+    <style>
+      .bazel_green_l1 { fill: #76d276; }
+      .bazel_green_l2 { fill: #42a047; }
+      .bazel_green_d1 { fill: #00701a; }
+      .bazel_green_d2 { fill: #014300; }
+      .docker_blue { fill: #1d63ed; }
+    </style>
+  </defs>
+
+  <!-- bottom containers -->
+  <path
+    id="row1_1"
+    class="docker_blue"
+    d="m 110.12,304.39 h -81.7 v 81.7 h 81.7 z" />
+  <path
+    id="row1_2"
+    class="docker_blue"
+    d="m 215.67,304.39 h -81.7 v 81.7 h 81.7 z" />
+  <path
+    id="row1_3"
+    class="bazel_green_l2"
+    d="m 321.22,304.39 h -81.7 v 81.7 h 81.7 z" />
+  <path
+    id="row1_4"
+    class="docker_blue"
+    d="m 426.77,304.39 h -81.7 v 81.7 h 81.7 z" />
+  <path
+    id="row1_5"
+    class="docker_blue"
+    d="m 532.32,304.39 h -81.7 v 81.7 h 81.7 z" />
+
+  <!-- middle containers -->
+  <path
+    id="row2_2"
+    class="bazel_green_l1"
+    d="m 215.67,201.2 h -81.7 v 81.7 h 81.7 z" />
+  <!--
+  <path
+    id="row2_3"
+    class="bazel_green_l1"
+    d="m 321.22,201.2 h -81.7 v 81.7 h 81.7 z" />
+  -->
+  <path
+    id="row2_4"
+    class="bazel_green_l1"
+    d="m 426.77,201.2 h -81.7 v 81.7 h 81.7 z" />
+
+  <!-- top container -->
+  <path
+    id="row_3_4"
+    class="docker_blue"
+    d="m 426.77,98 h -81.7 v 81.7 h 81.7 z" />
+
+  <!-- whale -->
+  <path
+    id="whale"
+    class="docker_blue"
+    d="M 769.96,343.25 C 751.42,330.77 702.7,325.44 667.28,334.98 665.37,299.7 647.18,269.97 613.9,244.03 l -12.32,-8.27 -8.21,12.4 c -16.14,24.5 -22.94,57.14 -20.53,86.81 1.9,18.28 8.26,38.83 20.53,53.74 -46.1,26.74 -88.59,20.67 -276.77,20.67 H 26.06 c -0.85,42.49 5.98,124.23 57.96,190.77 5.74,7.35 12.04,14.46 18.87,21.31 42.26,42.32 106.11,73.35 201.59,73.44 145.66,0.13 270.46,-78.6 346.37,-268.97 24.98,0.41 90.92,4.48 123.19,-57.88 0.79,-1.05 8.21,-16.54 8.21,-16.54 l -12.3,-8.27 z" />
+</svg>

@@ -1,0 +1,7 @@
+override:
+  style:
+    # we use different RUN layers intentionally to optimize caching, with
+    # heredocs to group all of the commands per layer, etc.
+    # https://github.com/hadolint/hadolint/wiki/DL3059#drawbacks
+    # https://github.com/hadolint/hadolint/issues/715
+    - DL3059
