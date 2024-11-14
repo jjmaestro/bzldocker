@@ -1,4 +1,4 @@
-[![docker-image](https://github.com/jjmaestro/bzldocker/actions/workflows/docker-image.yaml/badge.svg?branch=main&event=push)](https://github.com/jjmaestro/bzldocker/actions/workflows/docker-image.yaml)
+[![build-docker-images](https://github.com/jjmaestro/bzldocker/actions/workflows/build-docker-images.yaml/badge.svg?branch=main&event=push)](https://github.com/jjmaestro/bzldocker/actions/workflows/build-docker-images.yaml)
 
 # Bazel Docker Image
 
@@ -15,7 +15,7 @@ Multi-platform Bazel Docker image:
 ## Building and pushing the images
 
 The images are built and deployed to the [GHCR registry] by the
-[`docker-image`] GH Action.
+[`build-docker-images`] GH Action.
 
 ### Image Flavors
 
@@ -34,12 +34,12 @@ So, each image will be built from the following Dockerfiles (in order):
 
 ### Action Triggers
 
-The `docker-image` action is triggered by a push to the `main` branch when it
+The `build-docker-images` action is triggered by a push to the `main` branch when it
 affects the [`Dockerfile`]s (`base` or any of the flavors). It can also be
 [triggered manually] via the [Actions web UI], the GH REST API or the GH CLI
 tool:
 ```sh
-gh workflow run docker-image
+gh workflow run build-docker-images
 ```
 
 #### `push`
@@ -59,7 +59,7 @@ is, it will still set the `version` tag to the current date in ISO format but
 To override these defaults, use the `IMAGE_VERSION`, `TAG_LATEST` and `PUSH`
 variables, e.g.:
 ```sh
-gh workflow run docker-image -f IMAGE_VERSION=20241101-testing
+gh workflow run build-docker-images -f IMAGE_VERSION=20241101-testing
 ```
 
 [reproducible-containers/repro-sources-list.sh]: https://github.com/reproducible-containers/repro-sources-list.sh
@@ -67,7 +67,7 @@ gh workflow run docker-image -f IMAGE_VERSION=20241101-testing
 [`git_repository`]: https://bazel.build/rules/lib/repo/git#git_repository
 [`git_override`]: https://bazel.build/rules/lib/globals#git_override
 [GHCR registry]: https://github.com/jjmaestro/bzldocker/pkgs/container/bzldocker%2Fdebian
-[`docker-image`]: https://github.com/jjmaestro/bzldocker/blob/main/.github/workflows/docker-image.yaml
+[`build-docker-images`]: https://github.com/jjmaestro/bzldocker/blob/main/.github/workflows/build-docker-images.yaml
 [`Dockerfile`]: https://github.com/jjmaestro/bzldocker/blob/main/Dockerfile
 [triggered manually]: https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_dispatch
-[Actions web UI]: https://github.com/jjmaestro/bzldocker/actions/workflows/docker-image.yaml
+[Actions web UI]: https://github.com/jjmaestro/bzldocker/actions/workflows/build-docker-images.yaml
