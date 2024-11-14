@@ -21,3 +21,7 @@ repos:
   rev: v0.6.0
   hooks:
     - id: action-validator
+- repo: https://github.com/rhysd/actionlint
+  rev: v1.7.4
+  hooks:
+    - id: actionlint
