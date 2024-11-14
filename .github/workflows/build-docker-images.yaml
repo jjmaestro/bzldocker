@@ -1,128 +1,256 @@
-# Action to build and deploy a multi-platform Docker image from the Dockerfiles
-# in the repo.
+# Workflow to build and push Docker images from the Dockerfiles in the
+# repo.
 #
-# This GH Action builds three different "flavors" (types of images): `base`,
-# `main` and `debug`.
+# This workflow builds the images, pushes them to the [GHCR registry]
+# and links them with this repo.
 #
-# The workflow will dynamically compose the Dockerfile to build the images. It
-# will use the `base.Dockerfile` as a "preamble" that will be concatenated to
-# the `<FLAVOR>.Dockerfile.flavor` to create the final `Dockerfile` that will
-# be used for building the image.
+# ## Image "flavors"
 #
-# ### Action Triggers
+# This workflow builds different "flavors" (types of images). Each
+# "flavor" corresponds with a [Docker named build stage] (`... AS
+# <NAME>`) in the `Dockerfile`.
 #
-# The `docker-image` action is triggered by a push to the `main` branch when it
-# affects the `Dockerfile`s (`base` or any of the flavors). It can also be
-# triggered manually via the Actions web UI, the GH REST API or the GH CLI
-# tool:
+# ### Triggers
 #
-# gh workflow run docker-image
+# This workflow is triggered when a push to the `main` or `testing`
+# branch contains changes to the `Dockerfile`. It can also be [triggered
+# manually] via the [Actions web UI], the GH REST API or the GH CLI web
+# UI, the GH REST API or the GH CLI tool, e.g.:
+# ```sh
+# gh workflow run build-docker-images
+# ```
 #
 # #### `push`
 #
-# When triggered by a push, it will push to the GH registry two image tags for
-# every "image flavor":
-#   * a `version` tag where the version is the current date in ISO format
-#   * a `latest` tag pointing to the version tag
+# When triggered by a `push` event the action will:
+#
+# 1. Determine which `Dockerfile`s are affected.
+#
+# 2. For those `Dockerfile`s, determine the build targets in it.
+#
+# 3. Filter the build targets:
+#    * first with `RE_TARGET_INCLUDE`, which defaults to empty so it
+#      will match all build targets.
+#    * then with `RE_TARGET_EXCLUDE`: set by default to remove some of
+#      the build targets (those marked with `\-nobuild`).
+#
+# 4. Finally, it will spawn a `docker/build-push-action` job for each of
+#    the build targets. For every image built it will push to the
+#    registry three image tags:
+#    * a `sha` tag with the short hash of the commit that triggered the
+#      push
+#    * a `date` tag with the current date in ISO format (`YYYYMMDD`)
+#    * a `latest` tag
 #
 # #### `workflow_dispatch` (manual)
 #
-# When triggered by hand, the workflow will run as a `dry-run` by default. That
-# is, it will still set the `version` tag to the current date in ISO format but
-# **it won't tag `latest` or push the tags to the registry**.
+# When triggered manually (`workflow_dispatch` event) the workflow will
+# default to "running in test mode": it will follow the same steps as a
+# `push` run but with different default values (see
+# `workflow_dispatch.inputs`):
+#   * `RE_TARGET_INCLUDE` set to `^debian$` and
+#   * `RE_TARGET_EXCLUDE` set to the same pattern as in the `push` event
 #
-# To override these defaults, use the `IMAGE_VERSION`, `TAG_LATEST` and `PUSH`
-# variables, e.g.:
+# This effectively limits the build targets to only the "base" `debian`
+# image.
 #
-# gh workflow run docker-image -f IMAGE_VERSION=20241101-testing
+# The "test run" also limits the `PLATFORMS` to `linux/amd64`, to
+# further reduce the cost and time of a test run.
+#
+# Finally, it will build that target but **it won't tag `latest` or push
+# any of the image tags to the registry**.
+#
+# This "test mode" behavior can be changed by setting the
+# `workflow_dispatch.inputs` variables: `RE_TARGET_EXCLUDE`,
+# `RE_TARGET_INCLUDE`, `PLATFORMS`, `TAG_DATE`, `TAG_LATEST` and `PUSH`,
+# e.g.:
+# ```sh
+# gh workflow run build-ci-docker-images \
+#   -f RE_TARGET_INCLUDE=ubuntu2404 -f TAG_DATE=20241101
+# ```
 
-name: docker-image
+name: build-docker-images
 
 on:
   push:
     branches:
       - main
+      - testing
     paths:
       - "*Dockerfile*"
 
   workflow_dispatch:
+    # NOTE: keep default values in-sync with env defaults
     inputs:
-      IMAGE_VERSION:
-        description: "Image Version (default: YYYYMMDD)"
+      REPRODUCIBLE_CONTAINERS_VERSION:
+        description: Reproducible Containers version
+        default: 0.1.4
+      BAZELISK_VERSION:
+        description: Bazelisk version
+        default: 1.24.0
+      BAZEL_VERSION:
+        description: Bazel version
+        default: 7.3.1
+      RE_TARGET_EXCLUDE:
+        description: |-
+          Filter out Docker targets matching this extended regex pattern
+        default: \-nobuild
+      RE_TARGET_INCLUDE:
+        description: |-
+          Select Docker targets matching this extended regex pattern
+        default: ^debian$
+      PLATFORMS:
+        description: |-
+          Select platforms to build
+        default: linux/amd64
+      TAG_DATE:
+        description: Tag image date in ISO format (YYYYMMDD)
       TAG_LATEST:
-        description: "Tag image version as 'latest'"
+        description: Tag image version as 'latest'
         default: false
       PUSH:
-        description: "Push images to registry"
+        description: Push images to registry
         default: false
 
 env:
-  BASE_IMAGE: debian
-  BASE_IMAGE_TAG: bookworm-20240926-slim
-  BAZEL_VERSION: 7.4.0
-  REPRODUCIBLE_CONTAINERS_VERSION: 0.1.4
-  BAZELISK_VERSION: 1.20.0
-
   REGISTRY: ghcr.io
 
+  GH_EVENT_NAME: ${{ github.event_name }}
+  GH_REF_NAME: ${{ github.ref_name }}
+  GH_REPO: ${{ github.repository }}
+  GH_SHA: ${{ github.sha }}
+  GH_SHA_BEFORE: ${{ github.event.before }}
+
+  RE_TARGET_EXCLUDE: ${{ inputs.RE_TARGET_EXCLUDE || '\-nobuild' }}
+  RE_TARGET_INCLUDE: ${{ inputs.RE_TARGET_INCLUDE }}
+  PLATFORMS: ${{ inputs.PLATFORMS || 'linux/amd64,linux/arm64' }}
+  TAG_DATE: ${{ inputs.TAG_DATE }}
+  TAG_LATEST: ${{ inputs.TAG_LATEST }}
+  PUSH: ${{ github.event_name == 'push' || inputs.PUSH }}
+
+  REPRODUCIBLE_CONTAINERS_VERSION: ${{ inputs.REPRODUCIBLE_CONTAINERS_VERSION || '0.1.4' }}
+  BAZELISK_VERSION: ${{ inputs.BAZELISK_VERSION || '1.24.0' }}
+  BAZEL_VERSION: ${{ inputs.BAZEL_VERSION || '7.3.1' }}
+
 jobs:
-  docker:
+  setup-targets:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+
+    outputs:
+      targets: ${{ steps.define_targets.outputs.targets }}
+      targets_length: ${{ steps.define_targets.outputs.targets_length }}
+
+    steps:
+      - name: Repo checkout
+        uses: actions/checkout@v4
+
+      - name: Get DOCKERFILES
+        run: |-
+          # NOTE:
+          # GH_SHA_BEFORE is empty on pushing the first commit of a new branch
+          # or when running manually via workflow_dispatch
+          if [[ -z "$GH_SHA_BEFORE" ]]; then
+            DOCKERFILES="$(ls ./*Dockerfile*)"
+          else
+            DOCKERFILES="$(
+              git diff --name-only "$GH_SHA_BEFORE" "$GH_SHA" |
+                grep Dockerfile || {
+                  # NOTE:
+                  # this grep could fail if e.g. we are force-pushing a stack
+                  # of commits where one or more commits do change Dockerfiles
+                  # but there's no change to any Dockerfile between the last
+                  # commit and this forced push.
+                  echo "WARNING: EMPTY grep" >&2
+                  true
+                }
+            )"
+          fi
+
+          DOCKERFILES_JSON="$(echo -n "$DOCKERFILES" | jq -R '.' | jq -sc '.' )"
+
+          echo "DOCKERFILES_JSON=$DOCKERFILES_JSON"
+          echo "DOCKERFILES_JSON=$DOCKERFILES_JSON" >> "$GITHUB_ENV"
+
+      - name: Define targets
+        id: define_targets
+        run: |-
+          read -ra DOCKERFILES <<< "$(echo "$DOCKERFILES_JSON" | jq -r 'join(" ")')"
+
+          if [[ "${#DOCKERFILES[@]}" -gt 0 ]]; then
+            TARGETS_LS="$(
+              grep -i '^FROM .* AS ' "${DOCKERFILES[@]}" |
+                awk '{print $NF}' |
+                { grep -E "$RE_TARGET_INCLUDE" || true; } |
+                { grep -vE "$RE_TARGET_EXCLUDE" || true; } |
+                jq -R '.'
+            )"
+          else
+            TARGETS_LS=""
+          fi
+
+          TARGETS="$(echo "$TARGETS_LS" | jq -sc '.')"
+          TARGETS_LENGTH="$(echo "$TARGETS_LS" | jq -s 'length')"
+
+          echo "targets=$TARGETS"
+          echo "targets_length=$TARGETS_LENGTH"
+
+          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+          echo "targets_length=$TARGETS_LENGTH" >> "$GITHUB_OUTPUT"
+
+  build-and-publish-docker-images:
+    needs: setup-targets
+    if: ${{ needs.setup-targets.outputs.targets_length > 0 }}
+
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        flavor:
-          - name: base
-          - name: main
-          - name: debug
-            deps:
-              - main
+        target: ${{ fromJson(needs.setup-targets.outputs.targets) }}
+
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |-
-            *Dockerfile*
+      - name: Repo checkout
+        uses: actions/checkout@v4
 
       - name: Set up dynamic env
+        env:
+          MATRIX_TARGET: ${{ matrix.target }}
         run: |-
           declare -A TAGS
 
-          TAGS[version]="${{ github.event.inputs.IMAGE_VERSION }}"
-          # set default value if version is not set, is empty or an empty string
-          if [[ -z "${TAGS[version]+isset}" || -z "${TAGS[version]// }" ]]; then
-            TAGS[version]="$(date +%Y%m%d)"
-          fi
+          TAGS[sha]="${GH_SHA::7}"
 
-          GH_EVENT_NAME="${{ github.event_name }}"
-          TAG_LATEST="${{ github.event.inputs.TAG_LATEST }}"
+          TAGS[date]="$TAG_DATE"
+          # set default date value if TAG_DATE is not set, is empty
+          # or is an empty string
+          if [[ -z "${TAGS[date]+isset}" || -z "${TAGS[date]// }" ]]; then
+            TAGS[date]="$(date +%Y%m%d)"
+          fi
 
           if [[ "$GH_EVENT_NAME" == "push" || "$TAG_LATEST" == "true" ]]; then
             TAGS[latest]="latest"
           fi
 
-          FLAVOR="$BASE_IMAGE"
-          cat "base.Dockerfile" > Dockerfile
+          IMAGE_PREFIX="$GH_REPO"
 
-          if [[ "${{ matrix.flavor.name }}" != "base" ]]; then
-            FLAVOR="$BASE_IMAGE-${{ matrix.flavor.name }}"
-
-            declare -A DEPS
-            DEPS=( ${{ join(matrix.flavor.deps, ' ') }} )
-
-            for dep in ${DEPS[@]}; do
-              cat ${dep}.Dockerfile.flavor >> Dockerfile
-            done
-
-            cat ${{ matrix.flavor.name }}.Dockerfile.flavor >> Dockerfile
+          if [[ "$GH_REF_NAME" == "testing" ]]; then
+            IMAGE_PREFIX="$IMAGE_PREFIX/testing"
           fi
 
-          IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}/$FLAVOR"
+          IMAGE_NAME="$REGISTRY/$IMAGE_PREFIX/$MATRIX_TARGET"
 
           {
-            for tag in ${!TAGS[@]}; do
+            for tag in "${!TAGS[@]}"; do
               echo "IMAGE_TAG_${tag^^}=$IMAGE_NAME:${TAGS[$tag]}"
             done
-          } >> $GITHUB_ENV
+          } >> "$GITHUB_ENV"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -140,20 +268,17 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: Dockerfile
+          target: ${{ matrix.target }}
           platforms: |-
-            linux/amd64
-            linux/arm64
+            ${{ env.PLATFORMS }}
+          tags: |-
+            ${{ env.IMAGE_TAG_SHA }}
+            ${{ env.IMAGE_TAG_DATE }}
+            ${{ env.IMAGE_TAG_LATEST }}
           build-args: |-
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
-            BASE_IMAGE_TAG=${{ env.BASE_IMAGE_TAG }}
             REPRODUCIBLE_CONTAINERS_VERSION=${{ env.REPRODUCIBLE_CONTAINERS_VERSION }}
             BAZELISK_VERSION=${{ env.BAZELISK_VERSION }}
             BAZEL_VERSION=${{ env.BAZEL_VERSION }}
-          push: ${{ github.event_name == 'push' && true || github.event.inputs.PUSH }}
-          tags: |-
-            ${{ env.IMAGE_TAG_VERSION }}
-            ${{ env.IMAGE_TAG_LATEST }}
           labels: |-
             org.opencontainers.image.source=${{ github.repositoryUrl }}
+          push: ${{ env.PUSH }}
