@@ -53,7 +53,34 @@ $APT_INSTALL
 apt_install git
 EOF
 
+# allow to create a non-root user
+# (rules_python notoriously fails when running as root)
+ARG USERNAME=nonroot
+ARG HOMEDIR=/home/$USERNAME
+
+ENV USERNAME=$USERNAME
+ENV HOMEDIR=$HOMEDIR
+
+RUN /bin/bash <<EOF
+set -euxo pipefail
+
+[[ "$USERNAME" != "root" ]] && useradd \
+    --comment 'Non-root User' \
+    --create-home --home-dir "$HOMEDIR" \
+    --shell /bin/bash \
+    $USERNAME
+EOF
+
 # install bazel: running bazel --version triggers Bazelisk to download Bazel
 ARG BAZEL_VERSION
 ARG USE_BAZEL_VERSION=$BAZEL_VERSION
+
+USER root
 RUN /usr/bin/bazel --version
+
+USER $USERNAME
+RUN /bin/bash <<EOF
+set -euxo pipefail
+
+[[ "$USERNAME" != "root" ]] && /usr/bin/bazel --version
+EOF

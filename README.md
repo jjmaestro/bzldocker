@@ -17,6 +17,7 @@ Multi-platform (`amd64`, `arm64`) Bazel Docker image.
 
 * Debian based
 * Multi-platform: `amd64`, `arm64`
+* `nonroot` user
 * Bazelisk with Bazel cached
 * Uses [reproducible-containers/repro-sources-list.sh] for installing packages
   from a snapshot to help [Reproducible Builds].
