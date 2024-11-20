@@ -11,7 +11,7 @@
     ../../actions/workflows/pre-commit.yaml/badge.svg
 )](../../actions/workflows/pre-commit.yaml)
 
-Multi-platform (`amd64`, `arm64`) Bazel Docker image.
+Multi-platform (`amd64`, `arm64`) Bazel Docker images.
 
 ## ✨ Features
 
@@ -22,14 +22,31 @@ Multi-platform (`amd64`, `arm64`) Bazel Docker image.
 * Uses [reproducible-containers/repro-sources-list.sh] for installing packages
   from a snapshot to help [Reproducible Builds].
 
+## 🍧 Image "flavors"
+
+A "flavor" is a type of image. Flavors define variations of the base image,
+layering additional tools and configurations to support different use cases.
+
+Each image flavor corresponds to a specific [Docker named build stage] (`FROM
+... AS <name>`) in the [`Dockerfile`]. Each stage builds on the previous one to
+create incremental images:
+
+* [`debian`]: the base image, with Bazelisk and Bazel installed and cached.
+* [`debian-cc`]: adds `gcc` and `g++` for C/C++ toolchains.
+* [`debian-debug`]: adds useful debugging and interactive tools, including
+  shell enhancements like autocompletion.
+* [`debian-docker`]: installs Docker, enabling workflows such as [DooD (Docker
+  outside of Docker)].
+
 ## 🧱 Building
 
-To build the Docker image run:
+To build one of the Docker images run:
 
 <!-- markdownlint-disable MD013 -->
 ```sh
 docker buildx build \
     --file Dockerfile \
+    --target debian-cc \
     --platform "linux/amd64,linux/arm64" \
     --build-arg "BASE_IMAGE=debian" \
     --build-arg "BASE_IMAGE_TAG=stable-20241111-slim" \
@@ -37,16 +54,16 @@ docker buildx build \
     --build-arg "BAZELISK_VERSION=1.20.0" \
     --build-arg "BAZEL_VERSION=7.3.1" \
     --label "org.opencontainers.image.source=https://github.com/jjmaestro/bzldocker" \
-    --tag "ghcr.io/jjmaestro/bzldocker/debian:20241111" \
+    --tag "ghcr.io/jjmaestro/bzldocker/debian-cc:20241111" \
     .
 ```
 <!-- markdownlint-enable -->
 
-To push it to the [GHCR registry] run
+To push it to the GHCR registry run
 
 ```sh
 docker login --username $USER ghcr.io
-docker image push "ghcr.io/jjmaestro/bzldocker/debian:20241111"
+docker image push "ghcr.io/jjmaestro/bzldocker/debian-cc:20241111"
 ```
 
 > [!NOTE]
@@ -60,9 +77,15 @@ Please feel free to open [issues] and [PRs], contributions are always welcome!
 See [CONTRIBUTING.md] for more info on how to work with this repo.
 
 [CONTRIBUTING.md]: CONTRIBUTING.md
-[GHCR registry]: https://github.com/jjmaestro/bzldocker/pkgs/container/bzldocker%2Fdebian
+[`Dockerfile`]: ../../blob/main/Dockerfile
+[Docker named build stage]: https://docs.docker.com/build/building/multi-stage/#name-your-build-stages
+[DooD (Docker outside of Docker)]: https://www.nixknight.com/2022/01/dind-vs-dood/
 [PRs]: ../../pulls
 [Reproducible Builds]: https://reproducible-builds.org
 [authenticate with the GH container registry]: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
+[`debian`]: ../../pkgs/container/bzldocker%2Fdebian
+[`debian-cc`]: ../../pkgs/container/bzldocker%2Fdebian-cc
+[`debian-debug`]: ../../pkgs/container/bzldocker%2Fdebian-debug
+[`debian-docker`]: ../../pkgs/container/bzldocker%2Fdebian-docker
 [issues]: ../../issues
 [reproducible-containers/repro-sources-list.sh]: https://github.com/reproducible-containers/repro-sources-list.sh
