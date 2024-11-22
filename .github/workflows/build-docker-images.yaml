@@ -1,0 +1,189 @@
+name: build-docker-images
+
+on:
+  workflow_dispatch:
+    # NOTE: keep default values in-sync with env defaults
+    inputs:
+      BASE_IMAGE_TAG:
+        description: Docker base image tag
+      REPRODUCIBLE_CONTAINERS_VERSION:
+        description: Reproducible Containers version
+      BAZELISK_VERSION:
+        description: Bazelisk version
+      BAZEL_VERSION:
+        description: Bazel version
+      PLATFORMS:
+        description: |-
+          Select platforms to build
+        default: linux/amd64
+      RE_TARGET_INCLUDE:
+        description: |-
+          Select Docker targets matching this extended regex pattern
+        default: ^debian$
+      RE_TARGET_EXCLUDE:
+        description: |-
+          Filter out Docker targets matching this extended regex pattern
+        default: \-nobuild
+      TAG_DATE:
+        description: Tag image date in ISO format (YYYYMMDD)
+      TAG_LATEST:
+        description: Tag image version as 'latest'
+        default: false
+      PUSH:
+        description: Push images to registry
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+
+  GH_EVENT_NAME: ${{ github.event_name }}
+  GH_REF_NAME: ${{ github.ref_name }}
+  GH_REPO: ${{ github.repository }}
+  GH_SHA: ${{ github.sha }}
+  GH_SHA_BEFORE: ${{ github.event.before }}
+
+  PLATFORMS: ${{ inputs.PLATFORMS || 'linux/amd64,linux/arm64' }}
+  BASE_IMAGE_TAG: ${{ inputs.BASE_IMAGE_TAG || 'stable-20241111-slim' }}
+  REPRODUCIBLE_CONTAINERS_VERSION: ${{ inputs.REPRODUCIBLE_CONTAINERS_VERSION || '0.1.4' }}
+  BAZELISK_VERSION: ${{ inputs.BAZELISK_VERSION || '1.24.0' }}
+  BAZEL_VERSION: ${{ inputs.BAZEL_VERSION || '7.3.1' }}
+
+  RE_TARGET_EXCLUDE: ${{ inputs.RE_TARGET_EXCLUDE || '\-nobuild' }}
+  RE_TARGET_INCLUDE: ${{ inputs.RE_TARGET_INCLUDE || '.' }}
+  TAG_DATE: ${{ inputs.TAG_DATE }}
+  TAG_LATEST: ${{ inputs.TAG_LATEST }}
+  PUSH: ${{ inputs.PUSH }}
+
+jobs:
+  setup-docker-targets:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+
+    outputs:
+      targets: ${{ steps.define_targets.outputs.targets }}
+      targets_length: ${{ steps.define_targets.outputs.targets_length }}
+
+    steps:
+      - name: Repo checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Get DOCKERFILES
+        run: |-
+          DOCKERFILES="$(ls ./*Dockerfile*)"
+          DOCKERFILES_JSON="$(echo -n "$DOCKERFILES" | jq -R '.' | jq -sc '.' )"
+
+          echo "DOCKERFILES_JSON=$DOCKERFILES_JSON"
+          echo "DOCKERFILES_JSON=$DOCKERFILES_JSON" >> "$GITHUB_ENV"
+
+      - name: Define targets
+        id: define_targets
+        run: |-
+          read -ra DOCKERFILES <<< "$(echo "$DOCKERFILES_JSON" | jq -r 'join(" ")')"
+
+          if [[ "${#DOCKERFILES[@]}" -gt 0 ]]; then
+            TARGETS_LS="$(
+              grep -i '^FROM .* AS ' "${DOCKERFILES[@]}" |
+                awk '{print $NF}' |
+                { grep -E "$RE_TARGET_INCLUDE" || true; } |
+                { grep -vE "$RE_TARGET_EXCLUDE" || true; } |
+                jq -R '.'
+            )"
+          else
+            TARGETS_LS=""
+          fi
+
+          TARGETS="$(echo "$TARGETS_LS" | jq -sc '.')"
+          TARGETS_LENGTH="$(echo "$TARGETS_LS" | jq -s 'length')"
+
+          echo "targets=$TARGETS"
+          echo "targets_length=$TARGETS_LENGTH"
+
+          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+          echo "targets_length=$TARGETS_LENGTH" >> "$GITHUB_OUTPUT"
+
+  build-and-publish-docker-images:
+    needs: setup-docker-targets
+    if: ${{ needs.setup-docker-targets.outputs.targets_length > 0 }}
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    strategy:
+      matrix:
+        target: ${{ fromJson(needs.setup-docker-targets.outputs.targets) }}
+
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+
+    steps:
+      - name: Set up dynamic env
+        env:
+          MATRIX_TARGET: ${{ matrix.target }}
+        run: |-
+          declare -A TAGS
+
+          TAGS[sha]="${GH_SHA::7}"
+
+          TAGS[date]="$TAG_DATE"
+
+          # set default date value if TAG_DATE is not set, is empty
+          # or is an empty string
+          if [[ -z "${TAGS[date]+isset}" || -z "${TAGS[date]// }" ]]; then
+            TAGS[date]="$(date +%Y%m%d)"
+          fi
+
+          if [[ "$TAG_LATEST" == "true" ]]; then
+            TAGS[latest]="latest"
+          fi
+
+          IMAGE_PREFIX="$GH_REPO"
+
+          if [[ "$GH_REF_NAME" == "testing" ]]; then
+            IMAGE_PREFIX="$IMAGE_PREFIX/testing"
+          fi
+
+          IMAGE_NAME="$REGISTRY/$IMAGE_PREFIX/$MATRIX_TARGET"
+
+          {
+            for tag in "${!TAGS[@]}"; do
+              echo "IMAGE_TAG_${tag^^}=$IMAGE_NAME:${TAGS[$tag]}"
+            done
+          } >> "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf  # v3.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349  # v3.7.1
+
+      - name: Login to Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75  # v6.9.0
+        with:
+          target: ${{ matrix.target }}
+          platforms: |-
+            ${{ env.PLATFORMS }}
+          tags: |-
+            ${{ env.IMAGE_TAG_SHA }}
+            ${{ env.IMAGE_TAG_DATE }}
+            ${{ env.IMAGE_TAG_LATEST }}
+          build-args: |-
+            BASE_IMAGE_TAG=${{ env.BASE_IMAGE_TAG }}
+            REPRODUCIBLE_CONTAINERS_VERSION=${{ env.REPRODUCIBLE_CONTAINERS_VERSION }}
+            BAZELISK_VERSION=${{ env.BAZELISK_VERSION }}
+            BAZEL_VERSION=${{ env.BAZEL_VERSION }}
+          labels: |-
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+          push: ${{ env.PUSH }}
