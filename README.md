@@ -10,6 +10,9 @@
 [![pre-commit](
     ../../actions/workflows/pre-commit.yaml/badge.svg
 )](../../actions/workflows/pre-commit.yaml)
+[![build-docker-images](
+    ../../actions/workflows/build-docker-images.yaml/badge.svg
+)](../../actions/workflows/build-docker-images.yaml)
 
 Multi-platform (`amd64`, `arm64`) Bazel Docker images.
 
@@ -40,36 +43,9 @@ create incremental images:
 
 ## 🧱 Building
 
-To build one of the Docker images run:
-
-<!-- markdownlint-disable MD013 -->
-```sh
-docker buildx build \
-    --file Dockerfile \
-    --target debian-cc \
-    --platform "linux/amd64,linux/arm64" \
-    --build-arg "BASE_IMAGE=debian" \
-    --build-arg "BASE_IMAGE_TAG=stable-20241111-slim" \
-    --build-arg "REPRODUCIBLE_CONTAINERS_VERSION=0.1.4" \
-    --build-arg "BAZELISK_VERSION=1.20.0" \
-    --build-arg "BAZEL_VERSION=7.3.1" \
-    --label "org.opencontainers.image.source=https://github.com/jjmaestro/bzldocker" \
-    --tag "ghcr.io/jjmaestro/bzldocker/debian-cc:20241111" \
-    .
-```
-<!-- markdownlint-enable -->
-
-To push it to the GHCR registry run
-
-```sh
-docker login --username $USER ghcr.io
-docker image push "ghcr.io/jjmaestro/bzldocker/debian-cc:20241111"
-```
-
-> [!NOTE]
-> Check how to [authenticate with the GH container registry], you will usually
-> need to generate a GH Personal Access Token with (at least) `write:packages`
-> scope.
+The images are built with the `build-docker-images` [Github Actions workflow].
+The workflow builds the images, pushes them to the GHCR registry and links them
+with the repo. See the [`docs/`] directory for more details.
 
 ## 💡 Contributing
 
@@ -80,12 +56,13 @@ See [CONTRIBUTING.md] for more info on how to work with this repo.
 [`Dockerfile`]: ../../blob/main/Dockerfile
 [Docker named build stage]: https://docs.docker.com/build/building/multi-stage/#name-your-build-stages
 [DooD (Docker outside of Docker)]: https://www.nixknight.com/2022/01/dind-vs-dood/
+[Github Actions workflow]: https://docs.github.com/actions
 [PRs]: ../../pulls
 [Reproducible Builds]: https://reproducible-builds.org
-[authenticate with the GH container registry]: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
 [`debian`]: ../../pkgs/container/bzldocker%2Fdebian
 [`debian-cc`]: ../../pkgs/container/bzldocker%2Fdebian-cc
 [`debian-debug`]: ../../pkgs/container/bzldocker%2Fdebian-debug
 [`debian-docker`]: ../../pkgs/container/bzldocker%2Fdebian-docker
+[`docs/`]: docs/README.md
 [issues]: ../../issues
 [reproducible-containers/repro-sources-list.sh]: https://github.com/reproducible-containers/repro-sources-list.sh
