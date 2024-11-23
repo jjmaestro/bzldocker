@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=debian
 ARG BASE_IMAGE_TAG=bookworm-slim
-FROM $BASE_IMAGE:$BASE_IMAGE_TAG AS base
+FROM $BASE_IMAGE:$BASE_IMAGE_TAG AS debian
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -79,7 +79,7 @@ ARG USE_BAZEL_VERSION=$BAZEL_VERSION
 RUN /usr/bin/bazel --version
 
 
-FROM base AS debian-rbe
+FROM debian AS debian-rbe
 
 USER root
 
@@ -128,13 +128,15 @@ USER $USERNAME
 RUN /bin/bash <<EOF
 set -euxo pipefail
 
-[[ "$(whoami)" == "root" ]] && cat <<EOT >> ~/.bashrc
+if [[ "$(whoami)" == "root" ]]; then
+    cat <<EOT >> ~/.bashrc
 
 if [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
 fi
 
 EOT
+fi
 EOF
 
 WORKDIR $HOMEDIR/.local/share/bazel-completion
@@ -161,8 +163,9 @@ EOF
 RUN /bin/bash <<EOF
 set -euxo pipefail
 
-[[ "$(whoami)" == "root" ]] && \
+if [[ "$(whoami)" == "root" ]]; then
     echo -e '\nalias ls="ls --color=auto"' >> ~/.bashrc
+fi
 EOF
 
 
@@ -192,7 +195,9 @@ apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-co
 # --- 8< https://docs.docker.com/engine/install/debian/ ---
 
 adduser root docker
-[[ "$USERNAME" != "root" ]] && adduser "$USERNAME" docker
+if [[ "$USERNAME" != "root" ]]; then
+    adduser "$USERNAME" docker
+fi
 EOF
 
 USER $USERNAME
