@@ -1,6 +1,16 @@
 name: build-docker-images
 
 on:
+  push:
+    branches-ignore:
+      - "wip/**"
+    paths:
+      - "*Dockerfile*"
+      - ".github/workflows/build-docker-images.yaml"
+  pull_request:
+    branches:
+      - "main"
+  # manually run the workflow from the Actions tab
   workflow_dispatch:
     # NOTE: keep default values in-sync with env defaults
     inputs:
@@ -51,8 +61,8 @@ env:
   RE_TARGET_EXCLUDE: ${{ inputs.RE_TARGET_EXCLUDE || '\-nobuild' }}
   RE_TARGET_INCLUDE: ${{ inputs.RE_TARGET_INCLUDE || '.' }}
   TAG_DATE: ${{ inputs.TAG_DATE }}
-  TAG_LATEST: ${{ inputs.TAG_LATEST }}
-  PUSH: ${{ inputs.PUSH }}
+  TAG_LATEST: ${{ inputs.TAG_LATEST || github.event_name != 'workflow_dispatch' }}
+  PUSH: ${{ inputs.PUSH || github.event_name != 'workflow_dispatch' }}
 
 jobs:
   setup-docker-targets:
@@ -73,6 +83,29 @@ jobs:
       - name: Get DOCKERFILES
         run: |-
           DOCKERFILES="$(ls ./*Dockerfile*)"
+
+          # NOTE:
+          # GH_SHA_BEFORE is empty on pushing the first commit of a new branch
+          # or when running manually via workflow_dispatch
+          if [[ -n "$GH_SHA_BEFORE" ]]; then
+            DOCKERFILES="$(
+              git diff --name-only "$GH_SHA_BEFORE" "$GH_SHA" |
+                grep Dockerfile || {
+                  # NOTE:
+                  # this grep could fail if e.g. we are force-pushing a stack
+                  # of commits where one or more commits do change Dockerfiles
+                  # but there's no change to any Dockerfile between the last
+                  # commit and this forced push.
+                  echo "WARNING: EMPTY grep" >&2
+                  true
+                }
+            )"
+
+            if [[ -z "$DOCKERFILES" ]]; then
+              DOCKERFILES="$(ls ./*Dockerfile*)"
+            fi
+          fi
+
           DOCKERFILES_JSON="$(echo -n "$DOCKERFILES" | jq -R '.' | jq -sc '.' )"
 
           echo "DOCKERFILES_JSON=$DOCKERFILES_JSON"
