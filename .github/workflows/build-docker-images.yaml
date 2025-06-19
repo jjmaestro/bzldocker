@@ -53,10 +53,10 @@ env:
   GH_SHA_BEFORE: ${{ github.event.before }}
 
   PLATFORMS: ${{ inputs.PLATFORMS || 'linux/amd64,linux/arm64' }}
-  BASE_IMAGE_TAG: ${{ inputs.BASE_IMAGE_TAG || 'stable-20241111-slim' }}
+  BASE_IMAGE_TAG: ${{ inputs.BASE_IMAGE_TAG || 'stable-20250610-slim' }}
   REPRODUCIBLE_CONTAINERS_VERSION: ${{ inputs.REPRODUCIBLE_CONTAINERS_VERSION || '0.1.4' }}
-  BAZELISK_VERSION: ${{ inputs.BAZELISK_VERSION || '1.24.0' }}
-  BAZEL_VERSION: ${{ inputs.BAZEL_VERSION || '7.3.1' }}
+  BAZELISK_VERSION: ${{ inputs.BAZELISK_VERSION || '1.26.0' }}
+  BAZEL_VERSION: ${{ inputs.BAZEL_VERSION || '7.6.1' }}
 
   RE_TARGET_EXCLUDE: ${{ inputs.RE_TARGET_EXCLUDE || '\-nobuild' }}
   RE_TARGET_INCLUDE: ${{ inputs.RE_TARGET_INCLUDE || '.' }}
@@ -190,20 +190,20 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf  # v3.2.0
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392  # v3.6.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349  # v3.7.1
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2  # v3.10.0
 
       - name: Login to Registry
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3.3.0
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772  # v3.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75  # v6.9.0
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83  # v6.18.0
         with:
           target: ${{ matrix.target }}
           platforms: |-
